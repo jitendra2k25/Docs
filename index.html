@@ -1,0 +1,1464 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ContentPilot — Astro Publishing Pipeline</title>
+<style>
+  :root {
+    --brand: #4F46E5;
+    --brand-light: #EEF2FF;
+    --brand-mid: #818CF8;
+    --teal: #0F766E;
+    --teal-light: #CCFBF1;
+    --amber: #B45309;
+    --amber-light: #FEF3C7;
+    --purple: #7C3AED;
+    --purple-light: #EDE9FE;
+    --gray-50: #F9FAFB;
+    --gray-100: #F3F4F6;
+    --gray-200: #E5E7EB;
+    --gray-300: #D1D5DB;
+    --gray-400: #9CA3AF;
+    --gray-500: #6B7280;
+    --gray-700: #374151;
+    --gray-800: #1F2937;
+    --gray-900: #111827;
+    --green: #059669;
+    --green-light: #D1FAE5;
+    --red: #DC2626;
+    --red-light: #FEE2E2;
+    --text: #111827;
+    --text-muted: #6B7280;
+    --text-subtle: #9CA3AF;
+    --border: #E5E7EB;
+    --bg: #FFFFFF;
+    --surface: #F9FAFB;
+    --radius: 12px;
+    --radius-sm: 8px;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    font-size: 15px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* NAV */
+  .nav {
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    background: rgba(255,255,255,0.95);
+    border-bottom: 1px solid var(--border);
+    backdrop-filter: blur(8px);
+    padding: 0 2rem;
+  }
+  .nav-inner {
+    max-width: 1100px;
+    margin: 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 56px;
+  }
+  .nav-logo {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--text);
+    text-decoration: none;
+  }
+  .nav-logo-mark {
+    width: 30px; height: 30px;
+    background: var(--brand);
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    color: white;
+    font-size: 14px;
+    font-weight: 700;
+  }
+  .nav-steps {
+    display: flex;
+    gap: 4px;
+  }
+  .nav-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--gray-200);
+    cursor: pointer;
+    transition: background 0.2s;
+  }
+  .nav-dot.active { background: var(--brand); }
+  .nav-dot.done { background: var(--green); }
+
+  /* HERO */
+  .hero {
+    background: linear-gradient(135deg, #4F46E5 0%, #7C3AED 100%);
+    color: white;
+    padding: 5rem 2rem 4rem;
+    text-align: center;
+  }
+  .hero-eyebrow {
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    opacity: 0.75;
+    margin-bottom: 16px;
+  }
+  .hero h1 {
+    font-size: clamp(28px, 5vw, 48px);
+    font-weight: 700;
+    line-height: 1.15;
+    margin-bottom: 16px;
+    letter-spacing: -0.02em;
+  }
+  .hero p {
+    font-size: 17px;
+    opacity: 0.85;
+    max-width: 560px;
+    margin: 0 auto 32px;
+    line-height: 1.6;
+  }
+  .hero-stats {
+    display: flex;
+    justify-content: center;
+    gap: 40px;
+    flex-wrap: wrap;
+  }
+  .hero-stat { text-align: center; }
+  .hero-stat-num { font-size: 28px; font-weight: 700; }
+  .hero-stat-lbl { font-size: 12px; opacity: 0.7; margin-top: 2px; }
+
+  /* FLOW MAP */
+  .section { padding: 5rem 2rem; }
+  .section-inner { max-width: 1100px; margin: 0 auto; }
+  .section-eyebrow {
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--brand);
+    margin-bottom: 10px;
+  }
+  .section-title {
+    font-size: clamp(22px, 3vw, 32px);
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    margin-bottom: 10px;
+  }
+  .section-sub {
+    font-size: 15px;
+    color: var(--text-muted);
+    max-width: 600px;
+    line-height: 1.6;
+    margin-bottom: 3rem;
+  }
+
+  /* PIPELINE FLOW */
+  .flow-container {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+  }
+  .flow-phase {
+    display: grid;
+    grid-template-columns: 200px 1fr;
+    gap: 0;
+    border-left: 2px solid var(--border);
+    margin-left: 16px;
+    padding-left: 0;
+    position: relative;
+  }
+  .phase-label {
+    padding: 24px 24px 24px 0;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    text-align: right;
+    gap: 4px;
+    position: sticky;
+    top: 56px;
+    align-self: flex-start;
+  }
+  .phase-dot {
+    position: absolute;
+    left: -9px;
+    top: 34px;
+    width: 16px; height: 16px;
+    border-radius: 50%;
+    border: 2px solid white;
+    box-shadow: 0 0 0 2px var(--border);
+  }
+  .phase-name {
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-subtle);
+  }
+  .phase-tag {
+    font-size: 11px;
+    padding: 2px 8px;
+    border-radius: 20px;
+    font-weight: 500;
+  }
+  .tag-auto { background: var(--brand-light); color: var(--brand); }
+  .tag-human { background: var(--green-light); color: var(--green); }
+  .tag-ai { background: var(--purple-light); color: var(--purple); }
+  .tag-infra { background: var(--teal-light); color: var(--teal); }
+
+  .phase-steps {
+    padding: 20px 0 20px 32px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  /* STEP CARD */
+  .step-card {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+    transition: border-color 0.2s, box-shadow 0.2s;
+    cursor: pointer;
+  }
+  .step-card:hover {
+    border-color: var(--brand-mid);
+    box-shadow: 0 4px 16px rgba(79,70,229,0.08);
+  }
+  .step-card.gate {
+    border-color: var(--green);
+    background: var(--green-light);
+  }
+  .step-card.gate .step-header {
+    background: var(--green-light);
+  }
+  .step-header {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 16px 20px;
+    background: var(--bg);
+  }
+  .step-icon {
+    width: 36px; height: 36px;
+    border-radius: var(--radius-sm);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 17px;
+    flex-shrink: 0;
+  }
+  .step-title-group { flex: 1; }
+  .step-title {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--text);
+    margin-bottom: 2px;
+  }
+  .step-subtitle {
+    font-size: 13px;
+    color: var(--text-muted);
+  }
+  .step-chevron {
+    font-size: 12px;
+    color: var(--text-subtle);
+    transition: transform 0.2s;
+  }
+  .step-card.open .step-chevron { transform: rotate(180deg); }
+  .step-body {
+    display: none;
+    padding: 0 20px 20px;
+    border-top: 1px solid var(--border);
+  }
+  .step-card.open .step-body { display: block; }
+  .step-body-inner {
+    padding-top: 16px;
+    font-size: 14px;
+    color: var(--text-muted);
+    line-height: 1.7;
+  }
+  .detail-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-top: 14px;
+  }
+  .detail-item {
+    background: var(--surface);
+    border-radius: var(--radius-sm);
+    padding: 10px 12px;
+  }
+  .detail-label {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-subtle);
+    margin-bottom: 4px;
+  }
+  .detail-value {
+    font-size: 13px;
+    color: var(--text);
+    font-weight: 500;
+  }
+  .code-chip {
+    display: inline-block;
+    background: var(--gray-100);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 2px 8px;
+    font-family: 'SF Mono', 'Fira Code', monospace;
+    font-size: 12px;
+    color: var(--gray-700);
+  }
+
+  /* CONNECTOR */
+  .flow-connector {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0 0 0 248px;
+    margin: 4px 0;
+  }
+  .connector-line {
+    width: 2px;
+    height: 20px;
+    background: var(--border);
+    margin-left: 18px;
+  }
+  .connector-arrow {
+    font-size: 12px;
+    color: var(--text-subtle);
+    margin-left: 18px;
+  }
+
+  /* STATUS BADGE */
+  .status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 12px;
+    font-weight: 500;
+    padding: 3px 10px;
+    border-radius: 20px;
+  }
+  .status-dot { width: 6px; height: 6px; border-radius: 50%; }
+
+  /* GITHUB SECTION */
+  .github-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+    margin-top: 2rem;
+  }
+  .option-card {
+    border: 1.5px solid var(--border);
+    border-radius: var(--radius);
+    padding: 24px;
+    position: relative;
+    transition: border-color 0.2s;
+  }
+  .option-card.recommended {
+    border-color: var(--brand);
+    background: var(--brand-light);
+  }
+  .rec-pill {
+    position: absolute;
+    top: -11px;
+    left: 20px;
+    background: var(--brand);
+    color: white;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 2px 10px;
+    border-radius: 20px;
+    letter-spacing: 0.04em;
+  }
+  .option-icon {
+    width: 44px; height: 44px;
+    border-radius: var(--radius-sm);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 22px;
+    margin-bottom: 14px;
+  }
+  .option-title {
+    font-size: 17px;
+    font-weight: 600;
+    margin-bottom: 8px;
+    color: var(--text);
+  }
+  .option-desc {
+    font-size: 14px;
+    color: var(--text-muted);
+    line-height: 1.6;
+    margin-bottom: 14px;
+  }
+  .pros-cons { list-style: none; }
+  .pros-cons li {
+    font-size: 13px;
+    padding: 4px 0;
+    display: flex;
+    align-items: flex-start;
+    gap: 7px;
+    color: var(--text-muted);
+  }
+  .pros-cons li .icon { flex-shrink: 0; margin-top: 2px; font-size: 14px; }
+  .pros-cons li.pro .icon { color: var(--green); }
+  .pros-cons li.con .icon { color: var(--red); }
+
+  /* MASTRA */
+  .mastra-cards {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+    margin-top: 2rem;
+  }
+  .mastra-card {
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 20px;
+    text-align: center;
+  }
+  .mastra-num {
+    width: 44px; height: 44px;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    margin: 0 auto 12px;
+    font-size: 18px;
+    font-weight: 700;
+  }
+  .mastra-card-title { font-size: 14px; font-weight: 600; margin-bottom: 6px; }
+  .mastra-card-desc { font-size: 13px; color: var(--text-muted); line-height: 1.5; }
+
+  /* PUBLISH FLOW */
+  .publish-flow {
+    display: flex;
+    align-items: stretch;
+    gap: 0;
+    margin-top: 2rem;
+    overflow-x: auto;
+    padding-bottom: 8px;
+  }
+  .publish-node {
+    flex: 1;
+    min-width: 130px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 18px 14px;
+    text-align: center;
+    position: relative;
+    transition: background 0.3s, border-color 0.3s;
+  }
+  .publish-node.active {
+    background: var(--brand-light);
+    border-color: var(--brand);
+  }
+  .publish-node.done {
+    background: var(--green-light);
+    border-color: var(--green);
+  }
+  .publish-node-icon { font-size: 24px; margin-bottom: 8px; }
+  .publish-node-title { font-size: 13px; font-weight: 600; color: var(--text); }
+  .publish-node-sub { font-size: 11px; color: var(--text-muted); margin-top: 3px; }
+  .publish-arrow {
+    display: flex;
+    align-items: center;
+    padding: 0 6px;
+    color: var(--text-subtle);
+    font-size: 18px;
+    flex-shrink: 0;
+  }
+  .publish-timer {
+    font-size: 11px;
+    background: var(--brand);
+    color: white;
+    border-radius: 20px;
+    padding: 2px 8px;
+    margin-top: 8px;
+    display: inline-block;
+    font-weight: 500;
+  }
+  .publish-timer.green { background: var(--green); }
+
+  /* SIMULATE BUTTON */
+  .simulate-bar {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-top: 1.5rem;
+    flex-wrap: wrap;
+  }
+  .btn-primary {
+    background: var(--brand);
+    color: white;
+    border: none;
+    border-radius: var(--radius-sm);
+    padding: 10px 22px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.15s, transform 0.1s;
+  }
+  .btn-primary:hover { background: #4338CA; }
+  .btn-primary:active { transform: scale(0.98); }
+  .btn-secondary {
+    background: transparent;
+    color: var(--text-muted);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 10px 22px;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+  .btn-secondary:hover { background: var(--surface); }
+  .sim-status {
+    font-size: 13px;
+    color: var(--text-muted);
+  }
+
+  /* STATUS FLOW */
+  .status-timeline {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    margin-top: 1.5rem;
+  }
+  .status-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 16px;
+    padding: 10px 0;
+    opacity: 0.35;
+    transition: opacity 0.4s;
+  }
+  .status-row.active { opacity: 1; }
+  .status-row.done { opacity: 0.7; }
+  .status-indicator {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0;
+    width: 24px;
+    flex-shrink: 0;
+  }
+  .si-dot {
+    width: 24px; height: 24px;
+    border-radius: 50%;
+    border: 2px solid var(--border);
+    background: var(--bg);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-subtle);
+    transition: all 0.3s;
+    flex-shrink: 0;
+  }
+  .status-row.active .si-dot {
+    border-color: var(--brand);
+    background: var(--brand);
+    color: white;
+  }
+  .status-row.done .si-dot {
+    border-color: var(--green);
+    background: var(--green);
+    color: white;
+  }
+  .si-line {
+    width: 2px;
+    flex: 1;
+    min-height: 20px;
+    background: var(--border);
+    margin: 2px 0;
+  }
+  .status-content { padding-top: 2px; }
+  .status-name { font-size: 14px; font-weight: 600; color: var(--text); }
+  .status-desc { font-size: 13px; color: var(--text-muted); margin-top: 2px; }
+
+  /* ERROR SECTION */
+  .error-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 16px;
+    margin-top: 1.5rem;
+  }
+  .error-card {
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 20px;
+  }
+  .error-level {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-subtle);
+    margin-bottom: 6px;
+  }
+  .error-title { font-size: 15px; font-weight: 600; margin-bottom: 8px; }
+  .error-desc { font-size: 13px; color: var(--text-muted); line-height: 1.6; }
+
+  /* MDX PREVIEW */
+  .mdx-preview {
+    background: #1E1E2E;
+    border-radius: var(--radius);
+    padding: 24px;
+    margin-top: 1.5rem;
+    overflow-x: auto;
+  }
+  .mdx-preview pre {
+    font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+    font-size: 13px;
+    line-height: 1.7;
+    color: #CDD6F4;
+    white-space: pre;
+  }
+  .mdx-fm { color: #F38BA8; }
+  .mdx-key { color: #89B4FA; }
+  .mdx-val { color: #A6E3A1; }
+  .mdx-str { color: #FAB387; }
+  .mdx-h { color: #CBA6F7; font-weight: 600; }
+  .mdx-img { color: #94E2D5; }
+  .mdx-body { color: #CDD6F4; }
+
+  /* FOOTER */
+  .footer {
+    background: var(--gray-900);
+    color: var(--gray-400);
+    padding: 3rem 2rem;
+    text-align: center;
+  }
+  .footer h3 { color: white; font-size: 20px; margin-bottom: 8px; }
+  .footer p { font-size: 14px; line-height: 1.6; max-width: 480px; margin: 0 auto 20px; }
+  .footer-tags { display: flex; justify-content: center; gap: 8px; flex-wrap: wrap; }
+  .footer-tag {
+    background: rgba(255,255,255,0.08);
+    color: var(--gray-300);
+    border-radius: 20px;
+    padding: 4px 14px;
+    font-size: 13px;
+  }
+
+  /* RESPONSIVE */
+  @media (max-width: 720px) {
+    .flow-phase { grid-template-columns: 1fr; }
+    .phase-label { flex-direction: row; align-items: center; padding: 16px 0; text-align: left; position: static; }
+    .phase-dot { display: none; }
+    .github-grid, .mastra-cards, .error-grid { grid-template-columns: 1fr; }
+    .detail-grid { grid-template-columns: 1fr; }
+    .hero-stats { gap: 24px; }
+    .publish-node { min-width: 110px; }
+    .flow-connector { padding-left: 32px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav class="nav" aria-label="Pipeline navigation">
+  <div class="nav-inner">
+    <a href="#" class="nav-logo">
+      <div class="nav-logo-mark">CP</div>
+      ContentPilot
+    </a>
+    <div class="nav-steps" id="nav-dots" aria-label="Section progress"></div>
+  </div>
+</nav>
+
+<!-- HERO -->
+<header class="hero">
+  <p class="hero-eyebrow">End-to-end pipeline</p>
+  <h1>From keyword to live article<br>in one automated flow</h1>
+  <p>ContentPilot researches, writes, images, and publishes your Astro blog articles — with you in control at every important decision point.</p>
+  <div class="hero-stats">
+    <div class="hero-stat">
+      <div class="hero-stat-num">9</div>
+      <div class="hero-stat-lbl">pipeline stages</div>
+    </div>
+    <div class="hero-stat">
+      <div class="hero-stat-num">3</div>
+      <div class="hero-stat-lbl">human approval gates</div>
+    </div>
+    <div class="hero-stat">
+      <div class="hero-stat-num">~3 min</div>
+      <div class="hero-stat-lbl">deploy after commit</div>
+    </div>
+    <div class="hero-stat">
+      <div class="hero-stat-num">0</div>
+      <div class="hero-stat-lbl">manual file uploads</div>
+    </div>
+  </div>
+</header>
+
+<!-- PIPELINE WALKTHROUGH -->
+<section class="section" id="pipeline">
+  <div class="section-inner">
+    <p class="section-eyebrow">Step-by-step breakdown</p>
+    <h2 class="section-title">Every stage of the pipeline</h2>
+    <p class="section-sub">Click any step to expand full details. Human gates are highlighted in green — nothing passes without your approval.</p>
+
+    <div class="flow-container" id="flow">
+
+      <!-- PHASE: INPUT -->
+      <div class="flow-phase">
+        <div class="phase-dot" style="background:#4F46E5;"></div>
+        <div class="phase-label">
+          <span class="phase-name">Input</span>
+          <span class="phase-tag tag-human">You</span>
+        </div>
+        <div class="phase-steps">
+          <div class="step-card" onclick="toggleCard(this)">
+            <div class="step-header">
+              <div class="step-icon" style="background:#EEF2FF;">📝</div>
+              <div class="step-title-group">
+                <div class="step-title">You submit a topic request</div>
+                <div class="step-subtitle">Dashboard → New article → Fill in details</div>
+              </div>
+              <div class="step-chevron">▾</div>
+            </div>
+            <div class="step-body">
+              <div class="step-body-inner">
+                You open the ContentPilot dashboard and fill in three things: the primary keyword you want to rank for, the article title, and the template type (blog post, how-to guide, research article, etc.). You also select your brand — which has already been configured with your GitHub repo and image CDN details.
+                <div class="detail-grid">
+                  <div class="detail-item"><div class="detail-label">What you enter</div><div class="detail-value">Keyword, title, template</div></div>
+                  <div class="detail-item"><div class="detail-label">DB record created</div><div class="detail-value"><span class="code-chip">BlogQueue → PENDING</span></div></div>
+                  <div class="detail-item"><div class="detail-label">Queue</div><div class="detail-value">BullMQ job enqueued</div></div>
+                  <div class="detail-item"><div class="detail-label">Routing check</div><div class="detail-value">Brand outputTarget = ASTRO ✓</div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- PHASE: RESEARCH -->
+      <div class="flow-phase">
+        <div class="phase-dot" style="background:#7C3AED;"></div>
+        <div class="phase-label">
+          <span class="phase-name">Research</span>
+          <span class="phase-tag tag-auto">Automated</span>
+        </div>
+        <div class="phase-steps">
+
+          <div class="step-card" onclick="toggleCard(this)">
+            <div class="step-header">
+              <div class="step-icon" style="background:#EDE9FE;">🔍</div>
+              <div class="step-title-group">
+                <div class="step-title">SERP analysis</div>
+                <div class="step-subtitle">Top-ranking pages scanned and analysed</div>
+              </div>
+              <div class="step-chevron">▾</div>
+            </div>
+            <div class="step-body">
+              <div class="step-body-inner">
+                The system queries DataForSEO to pull the top 10 results for your primary keyword. It reads competitor content, identifies common angles, finds content gaps, and determines the recommended word count for your article to be competitive.
+                <div class="detail-grid">
+                  <div class="detail-item"><div class="detail-label">Data source</div><div class="detail-value">DataForSEO API</div></div>
+                  <div class="detail-item"><div class="detail-label">DB status</div><div class="detail-value"><span class="code-chip">SERP_ANALYSIS</span></div></div>
+                  <div class="detail-item"><div class="detail-label">Output</div><div class="detail-value">Research brief, gaps, angles</div></div>
+                  <div class="detail-item"><div class="detail-label">Duration</div><div class="detail-value">~20–40 seconds</div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- PHASE: OUTLINE + GATE 1 -->
+      <div class="flow-phase">
+        <div class="phase-dot" style="background:#7C3AED;"></div>
+        <div class="phase-label">
+          <span class="phase-name">Outline</span>
+          <span class="phase-tag tag-ai">AI + Review</span>
+        </div>
+        <div class="phase-steps">
+
+          <div class="step-card" onclick="toggleCard(this)">
+            <div class="step-header">
+              <div class="step-icon" style="background:#EDE9FE;">📋</div>
+              <div class="step-title-group">
+                <div class="step-title">Outline generation</div>
+                <div class="step-subtitle">AI creates section structure from research brief</div>
+              </div>
+              <div class="step-chevron">▾</div>
+            </div>
+            <div class="step-body">
+              <div class="step-body-inner">
+                Mastra calls the LLM with the research brief, your chosen template structure, and your target word count. It produces a detailed outline: sections, headings, target word counts per section, and which secondary keywords belong where.
+                <div class="detail-grid">
+                  <div class="detail-item"><div class="detail-label">Engine</div><div class="detail-value">Mastra workflow — Node 2</div></div>
+                  <div class="detail-item"><div class="detail-label">DB status</div><div class="detail-value"><span class="code-chip">OUTLINE_GENERATION</span></div></div>
+                  <div class="detail-item"><div class="detail-label">Output</div><div class="detail-value">Structured outline JSON</div></div>
+                  <div class="detail-item"><div class="detail-label">Next</div><div class="detail-value">Workflow pauses for your review</div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="step-card gate" onclick="toggleCard(this)">
+            <div class="step-header">
+              <div class="step-icon" style="background:#D1FAE5;">🙋</div>
+              <div class="step-title-group">
+                <div class="step-title">Gate 1 — Outline approval</div>
+                <div class="step-subtitle">You review & approve before any writing starts</div>
+              </div>
+              <div class="step-chevron">▾</div>
+            </div>
+            <div class="step-body">
+              <div class="step-body-inner">
+                The pipeline pauses completely. You see the proposed outline in your dashboard. You can approve it as-is, request revisions (which re-runs the outline node), or reject and start over. Nothing is written until you explicitly approve.
+                <div class="detail-grid">
+                  <div class="detail-item"><div class="detail-label">DB status (waiting)</div><div class="detail-value"><span class="code-chip">AWAITING_OUTLINE_APPROVAL</span></div></div>
+                  <div class="detail-item"><div class="detail-label">API endpoint</div><div class="detail-value"><span class="code-chip">POST /api/blog-queue/:id/approve-outline</span></div></div>
+                  <div class="detail-item"><div class="detail-label">On approve</div><div class="detail-value">New BullMQ job → content generation</div></div>
+                  <div class="detail-item"><div class="detail-label">On revision</div><div class="detail-value">Re-runs outline node with your feedback</div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- PHASE: WRITING -->
+      <div class="flow-phase">
+        <div class="phase-dot" style="background:#7C3AED;"></div>
+        <div class="phase-label">
+          <span class="phase-name">Writing</span>
+          <span class="phase-tag tag-ai">Mastra AI</span>
+        </div>
+        <div class="phase-steps">
+
+          <div class="step-card" onclick="toggleCard(this)">
+            <div class="step-header">
+              <div class="step-icon" style="background:#EDE9FE;">⚡</div>
+              <div class="step-title-group">
+                <div class="step-title">Dual-stream generation</div>
+                <div class="step-subtitle">Frontmatter & article body run in parallel</div>
+              </div>
+              <div class="step-chevron">▾</div>
+            </div>
+            <div class="step-body">
+              <div class="step-body-inner">
+                Mastra runs two LLM calls simultaneously. <strong>Stream A</strong> generates all the frontmatter metadata (title, SEO description, tags, date, layout path) as strict JSON — never YAML directly, to avoid formatting bugs. <strong>Stream B</strong> writes the full article body section by section, following your approved outline.
+                <br><br>
+                Mastra's reinforcement learning memory means both streams incorporate corrections from previous articles — if you changed tone or restructured sections before, those patterns are applied automatically this time.
+                <div class="detail-grid">
+                  <div class="detail-item"><div class="detail-label">Stream A output</div><div class="detail-value">Frontmatter as JSON object</div></div>
+                  <div class="detail-item"><div class="detail-label">Stream B output</div><div class="detail-value">Full markdown body</div></div>
+                  <div class="detail-item"><div class="detail-label">Why JSON not YAML?</div><div class="detail-value">LLMs make subtle YAML errors — JSON is machine-strict, then code converts it</div></div>
+                  <div class="detail-item"><div class="detail-label">Mastra learning</div><div class="detail-value">Past corrections baked into prompts</div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="step-card" onclick="toggleCard(this)">
+            <div class="step-header">
+              <div class="step-icon" style="background:#EDE9FE;">✅</div>
+              <div class="step-title-group">
+                <div class="step-title">Automated fact-check</div>
+                <div class="step-subtitle">Claims verified before reaching your inbox</div>
+              </div>
+              <div class="step-chevron">▾</div>
+            </div>
+            <div class="step-body">
+              <div class="step-body-inner">
+                A fact-checker runs automatically on the generated draft. It flags any claims that appear unsupported or potentially inaccurate. If issues are found, the status moves to a sub-gate before even reaching your review. You fix flagged claims in the inline editor, then mark it ready for review.
+                <div class="detail-grid">
+                  <div class="detail-item"><div class="detail-label">If issues found</div><div class="detail-value"><span class="code-chip">DRAFT_PAUSED_FOR_FACT_CHECK</span></div></div>
+                  <div class="detail-item"><div class="detail-label">If clean</div><div class="detail-value">Goes straight to draft review gate</div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="step-card gate" onclick="toggleCard(this)">
+            <div class="step-header">
+              <div class="step-icon" style="background:#D1FAE5;">🙋</div>
+              <div class="step-title-group">
+                <div class="step-title">Gate 2 — Draft approval</div>
+                <div class="step-subtitle">Full article review with inline editing</div>
+              </div>
+              <div class="step-chevron">▾</div>
+            </div>
+            <div class="step-body">
+              <div class="step-body-inner">
+                You see the full article draft plus fact-check results. You can edit any part of the article directly in the dashboard editor. When you're happy, click Approve — this queues the image generation and assembly stage.
+                <div class="detail-grid">
+                  <div class="detail-item"><div class="detail-label">DB status (waiting)</div><div class="detail-value"><span class="code-chip">AWAITING_DRAFT_APPROVAL</span></div></div>
+                  <div class="detail-item"><div class="detail-label">API endpoint</div><div class="detail-value"><span class="code-chip">POST /api/blog-queue/:id/approve-draft</span></div></div>
+                  <div class="detail-item"><div class="detail-label">On approve</div><div class="detail-value">New job → image generation stage</div></div>
+                  <div class="detail-item"><div class="detail-label">Inline edits</div><div class="detail-value">Recorded for Mastra learning loop</div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- PHASE: IMAGES -->
+      <div class="flow-phase">
+        <div class="phase-dot" style="background:#4F46E5;"></div>
+        <div class="phase-label">
+          <span class="phase-name">Images</span>
+          <span class="phase-tag tag-auto">Automated</span>
+        </div>
+        <div class="phase-steps">
+
+          <div class="step-card" onclick="toggleCard(this)">
+            <div class="step-header">
+              <div class="step-icon" style="background:#EEF2FF;">🖼️</div>
+              <div class="step-title-group">
+                <div class="step-title">Image generation & CDN upload</div>
+                <div class="step-subtitle">fal.ai generates → S3/CDN stores → permanent URLs returned</div>
+              </div>
+              <div class="step-chevron">▾</div>
+            </div>
+            <div class="step-body">
+              <div class="step-body-inner">
+                Three types of images are generated via fal.ai: the featured/hero image, in-article images at placement points identified by AI analysis, and any infographics. If your brand has a logo configured, it is composited onto images before upload. All images are uploaded to your CDN (fal.ai or S3 — configured per brand). The article gets permanent CDN URLs — not temporary generation URLs that would expire.
+                <div class="detail-grid">
+                  <div class="detail-item"><div class="detail-label">Image types</div><div class="detail-value">Featured, in-article, infographics</div></div>
+                  <div class="detail-item"><div class="detail-label">Storage</div><div class="detail-value">Your CDN (fal.ai / S3)</div></div>
+                  <div class="detail-item"><div class="detail-label">Logo compositing</div><div class="detail-value">Applied before upload if configured</div></div>
+                  <div class="detail-item"><div class="detail-label">On CDN failure</div><div class="detail-value">Non-blocking — article commits without that image, error logged</div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- PHASE: ASSEMBLY -->
+      <div class="flow-phase">
+        <div class="phase-dot" style="background:#4F46E5;"></div>
+        <div class="phase-label">
+          <span class="phase-name">Assembly</span>
+          <span class="phase-tag tag-auto">Automated</span>
+        </div>
+        <div class="phase-steps">
+
+          <div class="step-card" onclick="toggleCard(this)">
+            <div class="step-header">
+              <div class="step-icon" style="background:#EEF2FF;">🔧</div>
+              <div class="step-title-group">
+                <div class="step-title">File compilation — JSON → MDX</div>
+                <div class="step-subtitle">Frontmatter converted, images injected, MDX assembled</div>
+              </div>
+              <div class="step-chevron">▾</div>
+            </div>
+            <div class="step-body">
+              <div class="step-body-inner">
+                The compilation node takes all outputs — frontmatter JSON from Stream A, the markdown body from Stream B, and CDN image URLs from the image node — and stitches them into a single MDX file. The JSON frontmatter is converted to YAML by deterministic code (not AI), so formatting is always correct. In-article image markdown is injected at the right positions. The final file matches your template's frontmatter schema exactly.
+                <div class="detail-grid">
+                  <div class="detail-item"><div class="detail-label">Input</div><div class="detail-value">Frontmatter JSON + body markdown + CDN URLs</div></div>
+                  <div class="detail-item"><div class="detail-label">JSON → YAML</div><div class="detail-value">Deterministic code conversion, not AI</div></div>
+                  <div class="detail-item"><div class="detail-label">Output</div><div class="detail-value">Complete .mdx file string</div></div>
+                  <div class="detail-item"><div class="detail-label">DB status</div><div class="detail-value"><span class="code-chip">AWAITING_PUBLISH_APPROVAL</span></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="step-card gate" onclick="toggleCard(this)">
+            <div class="step-header">
+              <div class="step-icon" style="background:#D1FAE5;">🙋</div>
+              <div class="step-title-group">
+                <div class="step-title">Gate 3 — Publish approval</div>
+                <div class="step-subtitle">Full MDX preview, images, and frontmatter before commit</div>
+              </div>
+              <div class="step-chevron">▾</div>
+            </div>
+            <div class="step-body">
+              <div class="step-body-inner">
+                You see the final assembled MDX file with rendered preview, all image thumbnails, and the frontmatter metadata. Everything is exactly as it will appear in GitHub. When you click "Commit to GitHub," the final job is queued.
+                <div class="detail-grid">
+                  <div class="detail-item"><div class="detail-label">DB status (waiting)</div><div class="detail-value"><span class="code-chip">AWAITING_PUBLISH_APPROVAL</span></div></div>
+                  <div class="detail-item"><div class="detail-label">API endpoint</div><div class="detail-value"><span class="code-chip">POST /api/blog-queue/:id/publish</span></div></div>
+                  <div class="detail-item"><div class="detail-label">On approve</div><div class="detail-value">Final job → GitHub commit tool</div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- PHASE: PUBLISH -->
+      <div class="flow-phase">
+        <div class="phase-dot" style="background:#059669;"></div>
+        <div class="phase-label">
+          <span class="phase-name">Publish</span>
+          <span class="phase-tag tag-infra">Infrastructure</span>
+        </div>
+        <div class="phase-steps">
+
+          <div class="step-card" onclick="toggleCard(this)">
+            <div class="step-header">
+              <div class="step-icon" style="background:#D1FAE5;">📦</div>
+              <div class="step-title-group">
+                <div class="step-title">GitHub commit</div>
+                <div class="step-subtitle">MDX file pushed to your repo on a dedicated branch</div>
+              </div>
+              <div class="step-chevron">▾</div>
+            </div>
+            <div class="step-body">
+              <div class="step-body-inner">
+                The GitHub commit tool (built with Octokit) connects to your repository. It checks if the target branch exists — if not, it creates it from your default branch. It then commits the MDX file to <span class="code-chip">src/content/blog/[slug].mdx</span>. The file slug is generated from your article title (lowercased, special characters removed, spaces replaced with hyphens). If the file already exists (e.g. a republish), it updates it using the existing file's SHA.
+                <div class="detail-grid">
+                  <div class="detail-item"><div class="detail-label">Target branch</div><div class="detail-value"><span class="code-chip">astro-content-pilot</span> (configurable)</div></div>
+                  <div class="detail-item"><div class="detail-label">File path</div><div class="detail-value"><span class="code-chip">src/content/blog/[slug].mdx</span></div></div>
+                  <div class="detail-item"><div class="detail-label">Commit message</div><div class="detail-value">feat(content): add article — [title]</div></div>
+                  <div class="detail-item"><div class="detail-label">Stored in DB</div><div class="detail-value">commitSha, githubFileUrl, imageUrls</div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="step-card" onclick="toggleCard(this)">
+            <div class="step-header">
+              <div class="step-icon" style="background:#D1FAE5;">⚡</div>
+              <div class="step-title-group">
+                <div class="step-title">Cloudflare auto-redeploy</div>
+                <div class="step-subtitle">Commit detected → Astro builds → article goes live</div>
+              </div>
+              <div class="step-chevron">▾</div>
+            </div>
+            <div class="step-body">
+              <div class="step-body-inner">
+                Cloudflare Pages is connected to your GitHub repo via a webhook (one-time setup). The moment the commit lands on the <span class="code-chip">astro-content-pilot</span> branch, Cloudflare triggers an Astro build automatically. The build picks up the new MDX file, generates the static HTML page, and deploys it to Cloudflare's global edge network. The article is live — no manual steps needed.
+                <div class="detail-grid">
+                  <div class="detail-item"><div class="detail-label">Trigger</div><div class="detail-value">GitHub push → Cloudflare webhook</div></div>
+                  <div class="detail-item"><div class="detail-label">Build time</div><div class="detail-value">~1–3 minutes (Astro static build)</div></div>
+                  <div class="detail-item"><div class="detail-label">Deploy target</div><div class="detail-value">Cloudflare global edge CDN</div></div>
+                  <div class="detail-item"><div class="detail-label">DB status</div><div class="detail-value"><span class="code-chip">PUBLISHED ✅</span></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- STATUS SIMULATOR -->
+<section class="section" style="background:var(--surface);" id="simulator">
+  <div class="section-inner">
+    <p class="section-eyebrow">Live simulation</p>
+    <h2 class="section-title">Watch the status flow</h2>
+    <p class="section-sub">Simulate a full run to see every database status the article passes through, including the human approval pauses.</p>
+
+    <div class="simulate-bar">
+      <button class="btn-primary" onclick="runSimulation()">▶ Run simulation</button>
+      <button class="btn-secondary" onclick="resetSimulation()">Reset</button>
+      <span class="sim-status" id="sim-status">Press Run to start</span>
+    </div>
+
+    <div class="status-timeline" id="status-timeline"></div>
+  </div>
+</section>
+
+<!-- MASTRA LEARNING -->
+<section class="section" id="mastra">
+  <div class="section-inner">
+    <p class="section-eyebrow">Mastra AI engine</p>
+    <h2 class="section-title">The system gets smarter each article</h2>
+    <p class="section-sub">Mastra's reinforcement learning loop turns every correction you make into a permanent improvement for your brand.</p>
+
+    <div class="mastra-cards">
+      <div class="mastra-card">
+        <div class="mastra-num" style="background:#EDE9FE; color:#7C3AED;">1</div>
+        <div class="mastra-card-title">AI generates a draft</div>
+        <div class="mastra-card-desc">Using your template, brand voice, and research brief. The prompt already includes learnings from all previous articles for this brand.</div>
+      </div>
+      <div class="mastra-card">
+        <div class="mastra-num" style="background:#FEF3C7; color:#B45309;">2</div>
+        <div class="mastra-card-title">You make corrections</div>
+        <div class="mastra-card-desc">You adjust tone, restructure a section, fix a claim, or change a heading in the inline editor. Each change is recorded as a correction signal.</div>
+      </div>
+      <div class="mastra-card">
+        <div class="mastra-num" style="background:#D1FAE5; color:#059669;">3</div>
+        <div class="mastra-card-title">Mastra stores the pattern</div>
+        <div class="mastra-card-desc">The difference between what was generated and what you preferred is stored in your brand's correction memory. Mastra uses this to improve future prompts.</div>
+      </div>
+      <div class="mastra-card">
+        <div class="mastra-num" style="background:#EEF2FF; color:#4F46E5;">4</div>
+        <div class="mastra-card-title">Next article starts better</div>
+        <div class="mastra-card-desc">The same mistakes don't repeat. The generation prompts for Stream A and Stream B both receive your brand-specific correction history before producing output.</div>
+      </div>
+      <div class="mastra-card">
+        <div class="mastra-num" style="background:#EDE9FE; color:#7C3AED;">5</div>
+        <div class="mastra-card-title">Quality compounds over time</div>
+        <div class="mastra-card-desc">After 5–10 articles, the system has a rich model of your exact preferences — tone, structure, fact standards, and formatting — without any manual configuration.</div>
+      </div>
+      <div class="mastra-card">
+        <div class="mastra-num" style="background:#CCFBF1; color:#0F766E;">6</div>
+        <div class="mastra-card-title">Fewer edits at each gate</div>
+        <div class="mastra-card-desc">As corrections decrease, you spend less time at Gate 2. The approval flow gets faster. The loop reinforces itself — better output → fewer corrections → even better output.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- GITHUB CONNECTION -->
+<section class="section" style="background:var(--surface);" id="github">
+  <div class="section-inner">
+    <p class="section-eyebrow">GitHub connection</p>
+    <h2 class="section-title">Two ways to connect your repository</h2>
+    <p class="section-sub">ContentPilot needs write access to commit MDX files. Choose the method that fits your team's setup.</p>
+
+    <div class="github-grid">
+
+      <div class="option-card recommended">
+        <div class="rec-pill">Recommended</div>
+        <div class="option-icon" style="background:#EEF2FF;">🔌</div>
+        <div class="option-title">GitHub App (MCP)</div>
+        <div class="option-desc">Install the ContentPilot GitHub App from the GitHub Marketplace. It requests only the specific repository permissions needed — nothing else. You authorize access to one repo, and can revoke it instantly from your GitHub settings at any time.</div>
+        <ul class="pros-cons">
+          <li class="pro"><span class="icon">✓</span> No token to copy, manage, or rotate — ever expires</li>
+          <li class="pro"><span class="icon">✓</span> Permission-scoped to one repo only</li>
+          <li class="pro"><span class="icon">✓</span> Works for the whole team — not tied to one person's account</li>
+          <li class="pro"><span class="icon">✓</span> Revoke in one click from GitHub → Settings → Apps</li>
+          <li class="pro"><span class="icon">✓</span> Audit log of all commits made by the app</li>
+        </ul>
+        <div style="margin-top: 14px; padding: 12px; background: rgba(255,255,255,0.6); border-radius: 8px; font-size: 13px; color: var(--text-muted);">
+          <strong style="color:var(--text);">Setup:</strong> Brand Settings → Integrations → Connect GitHub → Authorize App → Select repository. Done.
+        </div>
+      </div>
+
+      <div class="option-card">
+        <div class="option-icon" style="background:#F3F4F6;">🔑</div>
+        <div class="option-title">Personal / Org access token</div>
+        <div class="option-desc">Generate a fine-grained GitHub personal access token and paste it into ContentPilot's brand settings. Works without installing any app — useful for private or self-hosted GitHub instances.</div>
+        <ul class="pros-cons">
+          <li class="pro"><span class="icon">✓</span> No app installation required</li>
+          <li class="pro"><span class="icon">✓</span> Works with GitHub Enterprise / self-hosted</li>
+          <li class="con"><span class="icon">✗</span> Token is tied to one user account — access breaks if they leave</li>
+          <li class="con"><span class="icon">✗</span> Tokens expire and must be manually rotated</li>
+          <li class="con"><span class="icon">✗</span> Classic tokens grant broader access than needed — use fine-grained</li>
+        </ul>
+        <div style="margin-top: 14px; padding: 12px; background: var(--surface); border-radius: 8px; font-size: 13px; color: var(--text-muted);">
+          <strong style="color:var(--text);">Token setup:</strong> GitHub → Settings → Developer settings → Fine-grained tokens → New token. Set repository access to your blog repo only. Enable <em>Contents: read & write</em>. Copy and paste into ContentPilot brand settings.
+        </div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- PUBLISH FLOW VISUALISER -->
+<section class="section" id="deploy">
+  <div class="section-inner">
+    <p class="section-eyebrow">Deployment chain</p>
+    <h2 class="section-title">From commit to live — automatically</h2>
+    <p class="section-sub">Once you click "Commit to GitHub", this is exactly what happens and how long each step takes.</p>
+
+    <div class="publish-flow" id="publish-flow">
+
+      <div class="publish-node" id="pn0">
+        <div class="publish-node-icon">🖱️</div>
+        <div class="publish-node-title">You click commit</div>
+        <div class="publish-node-sub">Dashboard action</div>
+      </div>
+
+      <div class="publish-arrow">→</div>
+
+      <div class="publish-node" id="pn1">
+        <div class="publish-node-icon">📦</div>
+        <div class="publish-node-title">ContentPilot API</div>
+        <div class="publish-node-sub">GitHub commit tool fires</div>
+        <div class="publish-timer" id="pt1">~2–5 sec</div>
+      </div>
+
+      <div class="publish-arrow">→</div>
+
+      <div class="publish-node" id="pn2">
+        <div class="publish-node-icon" style="color:black;">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.374 0 0 5.373 0 12c0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23A11.509 11.509 0 0 1 12 5.803c1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576C20.566 21.797 24 17.3 24 12c0-6.627-5.373-12-12-12z"/></svg>
+        </div>
+        <div class="publish-node-title">GitHub repo</div>
+        <div class="publish-node-sub">astro-content-pilot branch</div>
+        <div class="publish-timer" id="pt2">instant</div>
+      </div>
+
+      <div class="publish-arrow">→</div>
+
+      <div class="publish-node" id="pn3">
+        <div class="publish-node-icon">🌐</div>
+        <div class="publish-node-title">Cloudflare Pages</div>
+        <div class="publish-node-sub">Webhook triggers build</div>
+        <div class="publish-timer" id="pt3">~10 sec</div>
+      </div>
+
+      <div class="publish-arrow">→</div>
+
+      <div class="publish-node" id="pn4">
+        <div class="publish-node-icon">⚡</div>
+        <div class="publish-node-title">Astro builds</div>
+        <div class="publish-node-sub">Static site generation</div>
+        <div class="publish-timer" id="pt4">~1–3 min</div>
+      </div>
+
+      <div class="publish-arrow">→</div>
+
+      <div class="publish-node" id="pn5">
+        <div class="publish-node-icon">✅</div>
+        <div class="publish-node-title">Article is live</div>
+        <div class="publish-node-sub">On Cloudflare edge CDN</div>
+        <div class="publish-timer green" id="pt5">Live!</div>
+      </div>
+
+    </div>
+
+    <div class="simulate-bar" style="margin-top:2rem;">
+      <button class="btn-primary" onclick="animatePublish()">▶ Animate deploy flow</button>
+      <button class="btn-secondary" onclick="resetPublish()">Reset</button>
+    </div>
+  </div>
+</section>
+
+<!-- MDX OUTPUT -->
+<section class="section" style="background:var(--surface);" id="output">
+  <div class="section-inner">
+    <p class="section-eyebrow">Final output format</p>
+    <h2 class="section-title">What gets committed to GitHub</h2>
+    <p class="section-sub">Every published article is a production-ready MDX file with valid YAML frontmatter, permanent CDN image URLs, and clean markdown body — ready for Astro to render.</p>
+
+    <div class="mdx-preview">
+      <pre><span class="mdx-fm">---</span>
+<span class="mdx-key">title:</span> <span class="mdx-str">"10 Best Project Management Tools for Remote Teams in 2026"</span>
+<span class="mdx-key">metaDescription:</span> <span class="mdx-str">"Expert-reviewed guide to the top 10 PM tools for remote teams,</span>
+<span class="mdx-str">  with pricing, features, and real-world comparisons."</span>
+<span class="mdx-key">author:</span> <span class="mdx-str">"ContentPilot"</span>
+<span class="mdx-key">date:</span> <span class="mdx-val">2026-06-11</span>
+<span class="mdx-key">layout:</span> <span class="mdx-str">"../../layouts/BlogPost.astro"</span>
+<span class="mdx-key">tags:</span>
+<span class="mdx-val">  - "project management"</span>
+<span class="mdx-val">  - "remote work"</span>
+<span class="mdx-val">  - "team collaboration"</span>
+<span class="mdx-val">  - "productivity"</span>
+<span class="mdx-key">heroImage:</span> <span class="mdx-str">"https://cdn.yourdomain.com/blog/abc123/featured.jpg"</span>
+<span class="mdx-key">heroImageAlt:</span> <span class="mdx-str">"Best project management tools for remote teams"</span>
+<span class="mdx-fm">---</span>
+
+<span class="mdx-h">## What is project management software?</span>
+
+<span class="mdx-body">Project management software helps distributed teams plan, track,
+and deliver work without the overhead of constant meetings...</span>
+
+<span class="mdx-img">![Team using Asana on a laptop](https://cdn.yourdomain.com/blog/abc123/image-1.jpg)</span>
+
+<span class="mdx-h">## The 10 best tools compared</span>
+
+<span class="mdx-h">### 1. Asana</span>
+
+<span class="mdx-body">Asana is a leading work management platform trusted by over
+100,000 teams worldwide...</span></pre>
+    </div>
+
+    <div style="margin-top:16px; display:flex; gap:12px; flex-wrap:wrap;">
+      <div style="background:var(--brand-light); border-radius:8px; padding:10px 14px; font-size:13px; color:var(--brand); font-weight:500;">✓ YAML generated by code, not AI — always valid</div>
+      <div style="background:var(--green-light); border-radius:8px; padding:10px 14px; font-size:13px; color:var(--green); font-weight:500;">✓ Image URLs are permanent CDN links</div>
+      <div style="background:var(--purple-light); border-radius:8px; padding:10px 14px; font-size:13px; color:var(--purple); font-weight:500;">✓ Frontmatter matches your template's schema exactly</div>
+    </div>
+  </div>
+</section>
+
+<!-- ERROR HANDLING -->
+<section class="section" id="errors">
+  <div class="section-inner">
+    <p class="section-eyebrow">Error handling</p>
+    <h2 class="section-title">What happens when something goes wrong</h2>
+    <p class="section-sub">Every failure mode has a defined behaviour. Content is never silently lost.</p>
+
+    <div class="error-grid">
+      <div class="error-card">
+        <div class="error-level">Level 1</div>
+        <div class="error-title">AI generates bad JSON</div>
+        <div class="error-desc">If the frontmatter JSON fails schema validation, Mastra auto-retries the step up to 2 times. On third failure, the BullMQ job retries with exponential backoff (max 3 attempts). If all fail, status moves to <span class="code-chip">FAILED</span> and you're notified.</div>
+      </div>
+      <div class="error-card">
+        <div class="error-level">Level 2</div>
+        <div class="error-title">GitHub API error</div>
+        <div class="error-desc">401 Unauthorized → hard fail with message "GitHub token invalid — update in Brand Settings." 404 Not Found → hard fail "Repository not found — check owner/repo name." 422 Conflict → fetches latest SHA and retries once automatically.</div>
+      </div>
+      <div class="error-card">
+        <div class="error-level">Level 3</div>
+        <div class="error-title">Image CDN upload fails</div>
+        <div class="error-desc">Non-blocking. The pipeline continues without that image. The article still commits to GitHub. Failed image details are logged in <span class="code-chip">BlogQueue.metadata.imageGenerationError</span> so you can investigate separately.</div>
+      </div>
+      <div class="error-card">
+        <div class="error-level">Level 4</div>
+        <div class="error-title">Complete pipeline failure</div>
+        <div class="error-desc">If all retries are exhausted, the article draft is preserved in the database — content is never lost. Status moves to <span class="code-chip">FAILED</span> and the dashboard shows an "Attention Required" warning with the exact error reason.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer class="footer">
+  <h3>ContentPilot — Astro publishing pipeline</h3>
+  <p>Zero breaking changes to existing WordPress brands. All new Astro brands are opt-in, branch-isolated, and fully reversible at any time.</p>
+  <div class="footer-tags">
+    <span class="footer-tag">Mastra v1.41.0</span>
+    <span class="footer-tag">Octokit / GitHub API</span>
+    <span class="footer-tag">BullMQ queue</span>
+    <span class="footer-tag">Cloudflare Pages</span>
+    <span class="footer-tag">Astro MDX</span>
+    <span class="footer-tag">fal.ai / S3 images</span>
+  </div>
+</footer>
+
+<script>
+const STATUSES = [
+  { name: "PENDING", desc: "Article request submitted, BullMQ job enqueued", type: "auto" },
+  { name: "SERP_ANALYSIS", desc: "Top-ranking competitor pages being analysed", type: "auto" },
+  { name: "OUTLINE_GENERATION", desc: "AI generating article outline from research brief", type: "ai" },
+  { name: "AWAITING_OUTLINE_APPROVAL", desc: "⏸ Paused — waiting for your outline approval", type: "human" },
+  { name: "WRITING", desc: "Dual-stream generation: frontmatter JSON + article body", type: "ai" },
+  { name: "AWAITING_DRAFT_APPROVAL", desc: "⏸ Paused — waiting for your draft approval", type: "human" },
+  { name: "READY_TO_PUBLISH", desc: "Draft approved, image generation starting", type: "auto" },
+  { name: "AWAITING_PUBLISH_APPROVAL", desc: "⏸ Paused — waiting for your final publish approval", type: "human" },
+  { name: "PUBLISHED ✅", desc: "MDX committed to GitHub, Cloudflare redeploying", type: "done" }
+];
+
+let simTimer = null;
+let simIndex = -1;
+
+function buildTimeline() {
+  const tl = document.getElementById('status-timeline');
+  tl.innerHTML = '';
+  STATUSES.forEach((s, i) => {
+    const isLast = i === STATUSES.length - 1;
+    const colors = { auto: '#4F46E5', ai: '#7C3AED', human: '#059669', done: '#059669' };
+    const row = document.createElement('div');
+    row.className = 'status-row';
+    row.id = 'sr-' + i;
+    row.innerHTML = `
+      <div class="status-indicator">
+        <div class="si-dot" id="sid-${i}">${i+1}</div>
+        ${!isLast ? '<div class="si-line"></div>' : ''}
+      </div>
+      <div class="status-content">
+        <div class="status-name">${s.name}</div>
+        <div class="status-desc">${s.desc}</div>
+      </div>`;
+    tl.appendChild(row);
+  });
+}
+
+function runSimulation() {
+  resetSimulation();
+  buildTimeline();
+  document.getElementById('sim-status').textContent = 'Running…';
+  let i = 0;
+  function advance() {
+    if (i > 0) {
+      document.getElementById('sr-' + (i-1)).classList.remove('active');
+      document.getElementById('sr-' + (i-1)).classList.add('done');
+      document.getElementById('sid-' + (i-1)).textContent = '✓';
+    }
+    if (i < STATUSES.length) {
+      document.getElementById('sr-' + i).classList.add('active');
+      const delay = STATUSES[i].type === 'human' ? 2200 : 900;
+      document.getElementById('sim-status').textContent = STATUSES[i].type === 'human'
+        ? '⏸ Simulating human approval pause…'
+        : 'Processing: ' + STATUSES[i].name;
+      simTimer = setTimeout(() => { i++; advance(); }, delay);
+    } else {
+      document.getElementById('sim-status').textContent = '✅ Pipeline complete — article published!';
+    }
+  }
+  advance();
+}
+
+function resetSimulation() {
+  if (simTimer) { clearTimeout(simTimer); simTimer = null; }
+  simIndex = -1;
+  buildTimeline();
+  document.getElementById('sim-status').textContent = 'Press Run to start';
+}
+
+buildTimeline();
+
+function toggleCard(card) {
+  card.classList.toggle('open');
+}
+
+let publishTimer = null;
+let publishIndex = -1;
+
+function animatePublish() {
+  resetPublish();
+  const nodes = [0,1,2,3,4,5];
+  const delays = [0, 800, 1600, 2400, 4000, 7000];
+  nodes.forEach((n, idx) => {
+    setTimeout(() => {
+      if (idx > 0) {
+        document.getElementById('pn'+(idx-1)).classList.remove('active');
+        document.getElementById('pn'+(idx-1)).classList.add('done');
+      }
+      document.getElementById('pn'+idx).classList.add('active');
+    }, delays[idx]);
+  });
+  setTimeout(() => {
+    document.getElementById('pn5').classList.remove('active');
+    document.getElementById('pn5').classList.add('done');
+  }, 7800);
+}
+
+function resetPublish() {
+  for(let i=0;i<6;i++) {
+    const n = document.getElementById('pn'+i);
+    if(n) { n.classList.remove('active','done'); }
+  }
+}
+
+const sections = ['pipeline','simulator','mastra','github','deploy','output','errors'];
+const dots = document.getElementById('nav-dots');
+sections.forEach((id, i) => {
+  const d = document.createElement('div');
+  d.className = 'nav-dot';
+  d.title = id;
+  d.onclick = () => document.getElementById(id).scrollIntoView({behavior:'smooth'});
+  dots.appendChild(d);
+});
+
+const io = new IntersectionObserver(entries => {
+  entries.forEach(e => {
+    if (e.isIntersecting) {
+      const idx = sections.indexOf(e.target.id);
+      document.querySelectorAll('.nav-dot').forEach((d,i) => {
+        d.classList.toggle('active', i === idx);
+      });
+    }
+  });
+}, { threshold: 0.3 });
+
+sections.forEach(id => {
+  const el = document.getElementById(id);
+  if(el) io.observe(el);
+});
+</script>
+</body>
+</html>
